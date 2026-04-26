@@ -486,12 +486,24 @@ input[type=range]{width:100%;accent-color:#2C6AB8;height:3px}
     </div>
     <div class="dash-col-right">
       <div id="key-card-v2" class="kd-v2"><span class="card-label">Key dates</span><div style="font-size:12px;color:var(--ink4);margin-top:4px">Add dates in Settings →</div></div>
-      <div class="scorecard" style="margin-top:1rem">
-        <div class="sc-head"><span class="sc-title">Daily log</span></div>
-        <div class="habit-rows" id="habit-rows"></div>
-      </div>
     </div>
   </div>
+
+  <!-- DAILY LOG full width -->
+  <div class="scorecard" style="margin-top:1.25rem">
+    <div class="sc-head">
+      <span class="sc-title">Daily log</span>
+      <div style="display:flex;align-items:center;gap:6px">
+        <button onclick="moveScWeek(-1)" style="background:none;border:1px solid var(--rule);border-radius:6px;padding:3px 10px;font-family:Karla,sans-serif;font-size:12px;color:var(--ink3);cursor:pointer">←</button>
+        <span id="sc-week-label" style="font-size:11px;color:var(--ink3);min-width:110px;text-align:center"></span>
+        <button onclick="moveScWeek(1)" style="background:none;border:1px solid var(--rule);border-radius:6px;padding:3px 10px;font-family:Karla,sans-serif;font-size:12px;color:var(--ink3);cursor:pointer">→</button>
+        <button id="rest-btn" onclick="toggleRest()" class="rest-btn" style="margin-left:4px">Rest day</button>
+      </div>
+    </div>
+    <div class="alert-bar" id="alert-bar" style="border-radius:0;margin:0"></div>
+    <div class="habit-rows" id="habit-rows"></div>
+  </div>
+
   <div style="margin-top:1.25rem">
     <span class="slabel">Journey · May 2026 → Sep 2027</span>
     <div class="tl-strip" id="tl-strip"></div>
@@ -689,7 +701,8 @@ const MONTHLY_FOCUS=[
 /* ═══ DATA ═══ */
 const KEY='gb_v3';
 function D(){try{return JSON.parse(localStorage.getItem(KEY)||'null')||def();}catch{return def();}}
-function S(d){localStorage.setItem(KEY,JSON.stringify(d));}
+function _S(d){localStorage.setItem(KEY,JSON.stringify(d));}
+function S(d){_S(d);toast();}
 function def(){return{
   profile:{name:'',quote:'',why:'',rest:''},
   dates:{ielts:'',dep:'',reg:''},
@@ -981,97 +994,189 @@ function renderKeyDatesV2(){
   if(!items.length){card.innerHTML='<span class="card-label">Key dates</span><div style="font-size:12px;color:var(--ink4);margin-top:4px">Add dates in Settings →</div>';return;}
   card.innerHTML='<span class="card-label">Key dates</span>'+items.map(x=>{const n=daysTo(d.dates[x.k]),past=n<0;return`<div class="kd-v2-row"><span class="kd-v2-label">${x.l}</span><div><span class="kd-v2-num">${past?'✓':n}</span><span class="kd-v2-unit">${past?' done':' days'}</span></div></div>`;}).join('');
 }
-function renderScorecard(){
-  const d=D(),today=new Date(),dow=today.getDay();
-  const mon=new Date(today);mon.setDate(today.getDate()-((dow+6)%7));
-  const week=Array.from({length:7},(_,i)=>{const dt=new Date(mon);dt.setDate(mon.getDate()+i);return{s:fd(dt),dow:dt.getDay(),lbl:['M','T','W','T','F','S','S'][i],isT:fd(dt)===td()};});
-  document.getElementById('habit-rows').innerHTML=d.habits.map(h=>{
-    const appl=week.filter(w=>h.days.includes(w.dow));
-    const done=appl.filter(w=>isDone(d.logs[w.s]?.habits?.[h.id]));
-    const dots=week.map(w=>{
-      const log=d.logs[w.s]||{};
-      if(log.rest)return`<button class="hd-btn rest-cell">${w.lbl}</button>`;
-      if(!h.days.includes(w.dow))return`<button class="hd-btn na">${w.lbl}</button>`;
-      const val=log.habits?.[h.id],ck=isDone(val);
-      return`<button class="hd-btn${ck?' done':''}" onclick="tapHabit('${h.id}','${w.s}')" style="${ck?`background:${h.color};border-color:${h.color}`:''}"> ${w.lbl}</button>`;
-    }).join('');
-    // Inline time input for today
-    const todayApplies=h.days.includes(new Date().getDay());
-    const todayLog=d.logs[td()]||{};
-    const todayVal=todayLog.habits?.[h.id];
-    const todayMins=getMins(todayVal)||'';
-    const todayDone=isDone(todayVal);
-    const target=h.targetMins;
-    const targetHint=target?`<span style="font-size:9px;color:var(--ink4);margin-left:3px">/ ${fmtMins(target)}</span>`:'';
-    const timeRow=todayApplies&&!todayLog.rest?`
-      <div style="display:flex;align-items:center;gap:6px;padding:5px 12px 8px;flex-wrap:wrap">
-        <span style="font-size:10px;color:var(--ink4);min-width:52px">today</span>
-        <div style="display:flex;align-items:center;gap:4px">
-          <input
-            id="time-${h.id}"
-            type="number"
-            min="0" max="720"
-            value="${todayMins}"
-            placeholder="min"
-            onclick="event.stopPropagation()"
-            oninput="saveInlineTime('${h.id}',this.value)"
-            style="width:56px;border:1px solid ${todayDone?h.color:'var(--rule)'};border-radius:6px;padding:4px 8px;font-family:'Karla',sans-serif;font-size:12px;color:var(--ink);background:${todayDone?'white':'var(--paper2)'};outline:none;text-align:center;transition:border-color .15s"
-          >
-          <span style="font-size:11px;color:var(--ink4)">min</span>
-          ${targetHint}
-          ${todayMins&&target?`<span style="font-size:10px;color:${parseInt(todayMins)>=target?'var(--p2)':'var(--pre)'};font-weight:600;margin-left:2px">${parseInt(todayMins)>=target?'✓ done':'${Math.round(parseInt(todayMins)/target*100)}%'}</span>`:''}
-        </div>
-        <div style="display:flex;gap:3px;flex-wrap:wrap">
-          ${[15,30,45,60,90].map(m=>`<button onclick="setInlineTime('${h.id}',${m})" style="padding:2px 7px;border-radius:10px;border:1px solid var(--rule);background:var(--paper2);font-family:'Karla',sans-serif;font-size:10px;color:var(--ink4);cursor:pointer">${m}m</button>`).join('')}
-        </div>
-      </div>`:'';
-    const ruleKey=`${h.id}-${wk()}`,ruleVal=esc(d.weeklyRules?.[ruleKey]||'');
-    const ruleRow=`<div class="h-rule-row"><span class="h-rule-icon">↳</span><input class="h-rule-input" id="rule-${ruleKey}" value="${ruleVal}" placeholder="This week's focus for ${esc(h.name)}..." onblur="saveWeeklyRule('${h.id}','${ruleKey}',this.value)"></div>`;
-    return`<div class="h-habit-block">
-      <div class="h-row" style="grid-template-columns:80px 1fr auto"><span class="h-name">${esc(h.name)}</span><div class="h-days">${dots}</div><span class="h-tally">${done.length}/${appl.length}</span></div>
-      ${timeRow}
-      ${ruleRow}
-    </div>`;
-  }).join('');
-  document.getElementById('rest-btn').classList.toggle('on',!!(d.logs[td()]?.rest));
-  check2day();
-}
-function saveInlineTime(hid,val){
-  const mins=parseInt(val)||null;
-  const d=D();
-  if(!d.logs[td()])d.logs[td()]={habits:{},rest:false};
-  const cur=d.logs[td()].habits[hid];
-  // Mark done automatically when time is entered
-  d.logs[td()].habits[hid]={done:mins>0?true:(isDone(cur)||false),mins};
-  _S(d);toast();
-  // Refresh rings and streak without full re-render (avoid losing focus)
-  renderRings();
-  document.getElementById('st-habits').textContent=curStreak(d);
-  const wpct=weekPct(d);document.getElementById('st-days').textContent=wpct!==null?wpct+'%':'—';
-  // Update the dot color for today
-  const todayDow=new Date().getDay();
-  document.querySelectorAll('.hd-btn').forEach(btn=>{
-    if(btn.classList.contains('na')||btn.classList.contains('rest-cell'))return;
+/* ═══ SCORECARD ═══ */
+let scWeekOffset=0;
+function moveScWeek(dir){scWeekOffset+=dir;renderScorecard();}
+function getScWeek(){
+  const t=new Date(),dow=t.getDay();
+  const mon=new Date(t);mon.setDate(t.getDate()-((dow+6)%7)+scWeekOffset*7);
+  return Array.from({length:7},function(_,i){
+    const dt=new Date(mon);dt.setDate(mon.getDate()+i);
+    return{s:fd(dt),dow:dt.getDay(),dt:new Date(dt)};
   });
 }
-function setInlineTime(hid,mins){
-  const inp=document.getElementById('time-'+hid);
-  if(inp){inp.value=mins;saveInlineTime(hid,mins);}
+function renderScorecard(){
+  const d=D(),week=getScWeek(),todayStr=td(),isCurWeek=(scWeekOffset===0);
+  // Week label
+  const lbl=document.getElementById('sc-week-label');
+  if(lbl){
+    const fmt=function(dt){return dt.toLocaleDateString('en-GB',{day:'numeric',month:'short'});};
+    if(scWeekOffset===0)lbl.textContent='This week';
+    else if(scWeekOffset===-1)lbl.textContent='Last week';
+    else if(scWeekOffset===1)lbl.textContent='Next week';
+    else lbl.textContent=fmt(week[0].dt)+' – '+fmt(week[6].dt);
+  }
+  // Selected day
+  const hasSel=window._scSelDs&&week.some(function(w){return w.s===window._scSelDs;});
+  const selDs=hasSel?window._scSelDs:(isCurWeek?todayStr:week[0].s);
+  window._scSelDs=selDs;
+  const selLog=d.logs[selDs]||{habits:{},rest:false};
+  if(!selLog.habits)selLog.habits={};
+  const selDtObj=week.find(function(w){return w.s===selDs;})||week[0];
+  const selDt=selDtObj.dt;
+  const selLabel=selDs===todayStr?'today':selDt.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});
+  const rb=document.getElementById('rest-btn');
+  if(rb)rb.classList.toggle('on',!!selLog.rest);
+  // Build header row
+  const DLBLS=['Mo','Tu','We','Th','Fr','Sa','Su'];
+  let hdr='<div style="display:grid;grid-template-columns:72px 1fr;border-bottom:1px solid var(--rule);padding:6px 14px;background:var(--paper2)"><span></span><div style="display:flex;gap:2px">';
+  week.forEach(function(w,i){
+    const isT=(w.s===todayStr);
+    const col=isT?'var(--ink)':'var(--ink4)';
+    const bg=isT?'var(--paper3)':'transparent';
+    hdr+='<div data-selday="'+w.s+'" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:1px;cursor:pointer">'
+      +'<span style="font-size:9px;color:'+col+';font-weight:'+(isT?700:400)+';letter-spacing:.04em">'+DLBLS[i]+'</span>'
+      +'<span style="font-size:11px;color:'+col+';background:'+bg+';width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center">'+w.dt.getDate()+'</span>'
+      +'</div>';
+  });
+  hdr+='</div></div>';
+  // Build habit rows
+  let rows='';
+  d.habits.forEach(function(h){
+    const appl=week.filter(function(w){return h.days.includes(w.dow);});
+    const doneCount=appl.filter(function(w){
+      const log=d.logs[w.s]||{habits:{}};
+      return isDone((log.habits||{})[h.id]);
+    }).length;
+    // Day buttons
+    let dots='<div style="display:flex;gap:2px;flex:1">';
+    week.forEach(function(w){
+      const log=d.logs[w.s]||{habits:{},rest:false};
+      if(!log.habits)log.habits={};
+      const isSel=(w.s===selDs);
+      const selOut=isSel?'outline:2px solid #1c1b18;outline-offset:2px;':'';
+      if(log.rest){
+        dots+='<div style="flex:1;display:flex;justify-content:center" data-selday="'+w.s+'">'
+          +'<button class="hd-btn rest-cell" style="'+selOut+'font-size:10px">–</button></div>';
+      } else if(!h.days.includes(w.dow)){
+        dots+='<div style="flex:1;display:flex;justify-content:center">'
+          +'<button class="hd-btn na" style="cursor:default;font-size:10px">·</button></div>';
+      } else {
+        const val=(log.habits||{})[h.id];
+        const ck=isDone(val);
+        let bs='';
+        if(ck)bs+='background:'+h.color+';border-color:'+h.color+';color:#fff;';
+        if(isSel)bs+=selOut;
+        dots+='<div style="flex:1;display:flex;justify-content:center" data-selday="'+w.s+'">'
+          +'<button class="hd-btn'+(ck?' done':'')+'" data-hid="'+h.id+'" data-ds="'+w.s+'" style="'+bs+'">'+(ck?'✓':'')+'</button></div>';
+      }
+    });
+    dots+='</div>';
+    // Time row for selected day
+    let timeRow='';
+    if(h.days.includes(selDt.getDay())&&!selLog.rest){
+      const selVal=selLog.habits[h.id];
+      const selMins=getMins(selVal)||'';
+      const selDone=isDone(selVal);
+      const target=h.targetMins||0;
+      const pct=(selMins&&target)?Math.round(parseInt(selMins)/target*100):null;
+      const inputBorder=selDone?h.color:'var(--rule)';
+      let presetsHtml='';
+      [15,30,45,60,90].forEach(function(m){
+        presetsHtml+='<button data-preset="'+m+'" data-hid="'+h.id+'" data-ds="'+selDs+'" style="padding:2px 7px;border-radius:10px;border:1px solid var(--rule);background:var(--paper);font-family:Karla,sans-serif;font-size:10px;color:var(--ink3);cursor:pointer">'+m+'m</button>';
+      });
+      const pctHtml=pct!==null?('<span style="font-size:10px;font-weight:600;color:'+(pct>=100?'var(--p2)':'var(--pre)')+'">'+( pct>=100?'✓':pct+'%')+'</span>'):'';
+      const targetHtml=target?('<span style="font-size:10px;color:var(--ink4)">/ '+fmtMins(target)+'</span>'):'';
+      timeRow='<div style="display:flex;align-items:center;gap:6px;padding:4px 14px 8px;flex-wrap:wrap;border-top:1px solid var(--rule);background:var(--paper2)">'
+        +'<span style="font-size:10px;color:var(--ink4);min-width:48px">'+selLabel+'</span>'
+        +'<input id="time-'+h.id+'" type="number" min="0" max="720" value="'+selMins+'" placeholder="min" data-hid="'+h.id+'" data-ds="'+selDs+'" class="sc-time-input" style="width:54px;border:1.5px solid '+inputBorder+';border-radius:6px;padding:4px 7px;font-family:Karla,sans-serif;font-size:12px;color:var(--ink);background:white;outline:none;text-align:center">'
+        +'<span style="font-size:11px;color:var(--ink4)">min</span>'
+        +targetHtml+pctHtml
+        +'<div style="display:flex;gap:3px;flex-wrap:wrap">'+presetsHtml+'</div>'
+        +'</div>';
+    }
+    const ruleKey=h.id+'-'+wk();
+    const ruleVal=(d.weeklyRules&&d.weeklyRules[ruleKey])||'';
+    const ruleRow=isCurWeek?('<div class="h-rule-row"><span class="h-rule-icon">↳</span>'
+      +'<input class="h-rule-input sc-rule-input" data-hid="'+h.id+'" data-rk="'+ruleKey+'" value="'+esc(ruleVal)+'" placeholder="This week\'s focus for '+esc(h.name)+'..."></div>'):'';
+    rows+='<div class="h-habit-block"><div class="h-row" style="grid-template-columns:72px 1fr auto">'
+      +'<span class="h-name" style="font-size:11px">'+esc(h.name)+'</span>'
+      +dots
+      +'<span class="h-tally">'+doneCount+'/'+appl.length+'</span>'
+      +'</div>'+timeRow+ruleRow+'</div>';
+  });
+  document.getElementById('habit-rows').innerHTML=hdr+rows;
+  // Attach events — single delegated listener on container
+  const container=document.getElementById('habit-rows');
+  // Remove old listener if any
+  if(container._scHandler){container.removeEventListener('click',container._scHandler);}
+  container._scHandler=function(e){
+    // Habit toggle button
+    const habitBtn=e.target.closest('button[data-hid][data-ds]');
+    if(habitBtn&&!habitBtn.dataset.preset){
+      e.stopPropagation();
+      tapHabit(habitBtn.dataset.hid,habitBtn.dataset.ds);
+      return;
+    }
+    // Preset button
+    const presetBtn=e.target.closest('button[data-preset]');
+    if(presetBtn){
+      e.stopPropagation();
+      const inp=document.getElementById('time-'+presetBtn.dataset.hid);
+      if(inp)inp.value=presetBtn.dataset.preset;
+      saveInlineTime(presetBtn.dataset.hid,presetBtn.dataset.ds,presetBtn.dataset.preset);
+      return;
+    }
+    // Select day
+    const dayEl=e.target.closest('[data-selday]');
+    if(dayEl){
+      window._scSelDs=dayEl.dataset.selday;
+      renderScorecard();
+      return;
+    }
+  };
+  container.addEventListener('click',container._scHandler);
+  // Time inputs
+  container.querySelectorAll('.sc-time-input').forEach(function(inp){
+    inp.addEventListener('input',function(){
+      saveInlineTime(inp.dataset.hid,inp.dataset.ds,inp.value);
+    });
+  });
+  // Rule inputs
+  container.querySelectorAll('.sc-rule-input').forEach(function(inp){
+    inp.addEventListener('blur',function(){
+      saveWeeklyRule(inp.dataset.hid,inp.dataset.rk,inp.value);
+    });
+  });
+  check2day();
+}
+function saveInlineTime(hid,ds,val){
+  const mins=parseInt(val)||null;
+  const d=D();
+  if(!d.logs[ds])d.logs[ds]={habits:{},rest:false};
+  if(!d.logs[ds].habits)d.logs[ds].habits={};
+  const cur=d.logs[ds].habits[hid];
+  d.logs[ds].habits[hid]={done:mins>0?true:(isDone(cur)||false),mins:mins};
+  _S(d);toast();
+  renderRings();
+  const stH=document.getElementById('st-habits');if(stH)stH.textContent=curStreak(d);
+  const wpct=weekPct(d);const stD=document.getElementById('st-days');if(stD&&wpct!==null)stD.textContent=wpct+'%';
 }
 function tapHabit(hid,ds){
-  const d=D();if(!d.logs[ds])d.logs[ds]={habits:{},rest:false};
-  const cur=d.logs[ds].habits[hid],wasDone=isDone(cur);
-  if(wasDone){d.logs[ds].habits[hid]=false;}else{d.logs[ds].habits[hid]={done:true,mins:getMins(cur)};}
-  S(d);renderScorecard();renderRings();
-  document.getElementById('buddy-msg').innerHTML=buddy();
-  document.getElementById('st-habits').textContent=curStreak(d);
-  const wpct=weekPct(d);document.getElementById('st-days').textContent=wpct!==null?wpct+'%':'—';
+  const d=D();
+  if(!d.logs[ds])d.logs[ds]={habits:{},rest:false};
+  if(!d.logs[ds].habits)d.logs[ds].habits={};
+  const cur=d.logs[ds].habits[hid];
+  d.logs[ds].habits[hid]=isDone(cur)?false:{done:true,mins:getMins(cur)||null};
+  _S(d);renderScorecard();renderRings();
+  const bm=document.getElementById('buddy-msg');if(bm)bm.innerHTML=buddy();
+  const stH=document.getElementById('st-habits');if(stH)stH.textContent=curStreak(d);
+  const wpct=weekPct(d);const stD=document.getElementById('st-days');if(stD)stD.textContent=wpct!==null?wpct+'%':'—';
 }
-// Keep closeTP as no-op for backwards compat
 function closeTP(){}
 function setTPVal(){}
 function saveTP(){}
-function toggleRest(){const d=D(),t=td();if(!d.logs[t])d.logs[t]={habits:{},rest:false};d.logs[t].rest=!d.logs[t].rest;S(d);renderScorecard();document.getElementById('buddy-msg').innerHTML=buddy();}
+function toggleRest(){const d=D(),t=window._scSelDs||td();if(!d.logs[t])d.logs[t]={habits:{},rest:false};d.logs[t].rest=!d.logs[t].rest;S(d);renderScorecard();renderRings();document.getElementById('buddy-msg').innerHTML=buddy();}
 function check2day(){
   const d=D(),today=new Date();
   const y1=new Date(today);y1.setDate(today.getDate()-1);const y2=new Date(today);y2.setDate(today.getDate()-2);const miss=[];
@@ -1290,9 +1395,7 @@ function toast(msg='Saved ✓'){
 /* ═══ DEBOUNCE ═══ */
 function debounce(fn,ms=600){let t;return(...a)=>{clearTimeout(t);t=setTimeout(()=>fn(...a),ms);};}
 
-/* ═══ AUTO-SAVE WRAPPER ═══ */
-const _S=S;
-function S(d){_S(d);toast();}
+/* ═══ AUTO-SAVE WRAPPER ═══ — _S and S defined near top */
 
 /* ═══ AUTO-SAVE: SETTINGS ═══ */
 function attachSettingsAutoSave(){
